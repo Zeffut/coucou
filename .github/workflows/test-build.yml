@@ -1,0 +1,83 @@
+name: Test build (ad-hoc signed)
+
+# A build to try a branch on your own Mac: tests, both Mac targets, then the GitHub
+# build signed ad hoc (no Developer ID, not notarized) attached to a prerelease.
+# Official releases are still made with scripts/release.sh.
+on:
+  push:
+    branches: ['claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: cd NotchBuddy && xcodegen
+
+      - name: Tests
+        run: |
+          for t in screen-geometry claude-hooks display-choice desktop-mochi auto-close safe-links \
+                   claude-response chat-parsing plan-gauge ask-question diff-engine github-pulse \
+                   github-activity wardrobe claude-settings chat-apps; do
+            echo "::group::$t"
+            bash "scripts/test-$t.sh"
+            echo "::endgroup::"
+          done
+
+      - name: Build App Store target (unsigned, compile check)
+        run: |
+          xcodebuild \
+            -project NotchBuddy/NotchBuddy.xcodeproj \
+            -scheme CoucouAppStore \
+            -configuration Debug \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Build GitHub app (Release)
+        run: |
+          xcodebuild \
+            -project NotchBuddy/NotchBuddy.xcodeproj \
+            -scheme NotchBuddy \
+            -configuration Release \
+            -derivedDataPath build \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Sign ad hoc and zip
+        run: |
+          APP="build/Build/Products/Release/Coucou.app"
+          test -d "$APP"
+          codesign --force --deep --options runtime \
+            --entitlements NotchBuddy/Resources/Coucou.entitlements --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist"
+          ditto -c -k --keepParent "$APP" Coucou.zip
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="test-$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
+          cat > notes.md <<EOF
+          Test build of \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA::7}, signed ad hoc: not notarized.
+
+          Install: unzip, move **Coucou.app** to Applications, then in Terminal run
+          \`xattr -dr com.apple.quarantine /Applications/Coucou.app\` once and open it.
+          EOF
+          gh release create "$TAG" Coucou.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Coucou test build ($TAG)" \
+            --notes-file notes.md \
+            --prerelease
