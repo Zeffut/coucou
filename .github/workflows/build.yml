@@ -63,6 +63,9 @@ jobs:
       - name: Claude settings file tests
         run: bash scripts/test-claude-settings.sh
 
+      - name: Chat app watcher tests
+        run: bash scripts/test-chat-apps.sh
+
       - name: Build
         run: |
           xcodebuild \

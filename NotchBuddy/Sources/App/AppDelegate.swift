@@ -213,6 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #if !APPSTORE
         _ = MusicController.shared
+        ChatAppWatcher.shared.start()
         #endif
     }
 }
