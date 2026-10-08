@@ -435,6 +435,7 @@ struct SettingsView: View {
         }
 
         #if PHONE_LINK
+        if CloudProbe.isAvailable {
         GroupBox("iPhone") {
             VStack(alignment: .leading, spacing: 6) {
                 Toggle(String(localized: "iphone.sync.toggle"), isOn: $iPhoneSyncEnabled)
@@ -461,6 +462,7 @@ struct SettingsView: View {
                 #endif
             }
             .padding(6)
+        }
         }
         #endif
     }
