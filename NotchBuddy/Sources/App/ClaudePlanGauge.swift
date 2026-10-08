@@ -28,6 +28,39 @@ enum ClaudePlanGauge {
         return PlanUsage(fiveHour: fh, sevenDay: sd, updatedAt: Date())
     }
 
+    /// Parses the answer of Claude's usage endpoint (`/api/oauth/usage`, the source of
+    /// Claude Code's /usage): `five_hour` / `seven_day` with `utilization` (0–100) and an
+    /// ISO 8601 `resets_at`. Same checks as the statusline payload.
+    static func parseUsageResponse(_ json: [String: Any]) -> PlanUsage? {
+        var limits: [String: Any] = [:]
+        for key in ["five_hour", "seven_day"] {
+            guard let w = json[key] as? [String: Any],
+                  let pct = (w["utilization"] as? Double) ?? (w["utilization"] as? Int).map(Double.init),
+                  let reset = (w["resets_at"] as? String).flatMap(isoDate) else { continue }
+            limits[key] = ["used_percentage": pct, "resets_at": reset.timeIntervalSince1970]
+        }
+        return parse(payload: ["rate_limits": limits])
+    }
+
+    /// The access token in Claude Code's Keychain item ("Claude Code-credentials"),
+    /// nil if missing or expired (Claude Code refreshes it; Coucou never does).
+    static func accessToken(fromCredentials data: Data, now: Date = Date()) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let oauth = json["claudeAiOauth"] as? [String: Any],
+              let token = oauth["accessToken"] as? String, !token.isEmpty else { return nil }
+        if let expiresMs = (oauth["expiresAt"] as? Double) ?? (oauth["expiresAt"] as? Int).map(Double.init),
+           Date(timeIntervalSince1970: expiresMs / 1000) <= now { return nil }
+        return token
+    }
+
+    /// ISO 8601 with or without fractional seconds (any number of digits).
+    static func isoDate(_ string: String) -> Date? {
+        let trimmed = string.replacingOccurrences(of: #"\.\d+"#, with: "", options: .regularExpression)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: trimmed)
+    }
+
     private static func parseWindow(_ raw: Any?) -> PlanWindow? {
         guard let d = raw as? [String: Any] else { return nil }
         let rawPct: Double

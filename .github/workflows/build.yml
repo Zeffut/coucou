@@ -66,6 +66,9 @@ jobs:
       - name: Chat app watcher tests
         run: bash scripts/test-chat-apps.sh
 
+      - name: Source window tests
+        run: bash scripts/test-source-focus.sh
+
       - name: Build
         run: |
           xcodebuild \

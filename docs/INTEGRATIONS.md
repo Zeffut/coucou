@@ -104,6 +104,10 @@ Claude Code envoie, à chaque réponse et avec un debounce de 300 ms, un JSON à
 
 nb-hook.py, en mode `--statusline`, lit le JSON de stdin, en extrait `rate_limits` et `session_id`, et envoie `{"coucou_kind": "statusline", …}` au socket en fire-and-forget (timeout 0,3 s). Si une `statusLine` précédente existait (sauvegardée dans `statusline-previous.json` à côté de nb-hook), elle est appelée via `/bin/sh -c` avec le même stdin et sa sortie est réécrite telle quelle (timeout 10 s, couleurs ANSI comprises).
 
+### Endpoint d'usage (onglet Code de l'app Claude)
+
+L'onglet Code de l'app Claude n'exécute pas la `statusLine` : sans terminal, la jauge resterait figée. Quand le pill s'affiche ou qu'on clique dessus (au plus une fois par minute), `ClaudeUsageFetcher` lit le jeton OAuth de Claude Code dans le trousseau (élément `Claude Code-credentials`, via `/usr/bin/security`, que l'élément autorise déjà : aucune demande macOS) et appelle `GET https://api.anthropic.com/api/oauth/usage` (en-tête `anthropic-beta: oauth-2025-04-20`), la source du `/usage` de Claude Code. `five_hour` / `seven_day` (`utilization` 0–100, `resets_at` ISO 8601) passent par les mêmes contrôles que `rate_limits`. Le jeton n'est jamais stocké, journalisé ni rafraîchi par Coucou ; s'il a expiré, rien n'est demandé jusqu'à ce que Claude Code le renouvelle. GitHub build uniquement. La valeur la plus récente, `statusLine` ou endpoint, gagne.
+
 ### Installation et activation
 
 Réglages → Agents → Plan usage → **Install relay**. Coucou montre le diff de `~/.claude/settings.json` avant d'écrire quoi que ce soit. Si une `statusLine` existait, seul le champ `command` est remplacé ; les autres champs (`padding`, `refreshInterval`, etc.) sont conservés. Une fois le relais installé, activer le toggle **Show in the notch** pour faire apparaître le pill dans l'en-tête. Si le toggle est activé avant l'installation du relais, l'installation est lancée automatiquement ; le toggle s'active après confirmation.
