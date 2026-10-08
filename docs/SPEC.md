@@ -49,7 +49,8 @@ Grille compact : pastilles Ø 9,5 autour du point (largeur − 27, hN/2), écart
 7. **Alertes** (permission, question, erreur) : l'island s'ouvre seule sur la vue de l'alerte, **même si Louis est absent**, et reste ouverte (pas de fermeture auto) jusqu'à sa réponse.
 8. **Terminé** : l'island s'ouvre sur la vue `finished` pendant 5,2 s, puis retire la tâche et se replie.
 9. Plusieurs alertes en même temps : file d'attente, une à la fois, l'ordre d'arrivée.
-10. **Focus** : le gros bonhomme représente la tâche en focus (la dernière alerte, sinon la première qui travaille). Les autres tâches sont les mini-bonhommes. Cliquer un mini-bonhomme le met en focus.
+10. **Fenêtre de la session au premier plan** : quand l'app d'où vient l'événement (bundle id `__CFBundleIdentifier` du hook, sinon `TERM_PROGRAM`) est au premier plan — et, si elle a plusieurs fenêtres et que l'Accessibilité est accordée, que le titre de la fenêtre active contient le dossier du projet —, Mochi change d'état sans son, sans badge et sans ouvrir l'island (démarrage, prompt, terminé, erreur, limite). Permission et question : réponse `ask` immédiate, la fenêtre pose la question elle-même, pas de carte. Logique pure dans `SourceFocusLogic.swift` (testée par `scripts/test-source-focus.sh`), lecture AppKit/AX dans `SourceFocus.swift`. Les apps de chat (`ChatAppWatcher`) suivent la même règle via `coucou_quiet`.
+11. **Focus** : le gros bonhomme représente la tâche en focus (la dernière alerte, sinon la première qui travaille). Les autres tâches sont les mini-bonhommes. Cliquer un mini-bonhomme le met en focus.
 
 ## 4. Animations de l'island
 

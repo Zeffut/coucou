@@ -27,7 +27,7 @@ jobs:
         run: |
           for t in screen-geometry claude-hooks display-choice desktop-mochi auto-close safe-links \
                    claude-response chat-parsing plan-gauge ask-question diff-engine github-pulse \
-                   github-activity wardrobe claude-settings chat-apps; do
+                   github-activity wardrobe claude-settings chat-apps source-focus; do
             echo "::group::$t"
             bash "scripts/test-$t.sh"
             echo "::endgroup::"

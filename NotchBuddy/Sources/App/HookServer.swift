@@ -401,9 +401,12 @@ final class HookServer: @unchecked Sendable {
         }
 
         let focused = state.focusId == agentId
-        // Set by the chat app watcher when the app is in front: the user already sees the
-        // answer, so Mochi updates without sound, badge or expanding.
-        let quiet = payload["coucou_quiet"] as? Bool ?? false
+        // The user already sees the session: the chat app watcher sets coucou_quiet when the
+        // app is in front, and hook events check their own window. Mochi then updates
+        // without sound, badge or expanding.
+        let alerting: Set<String> = ["SessionStart", "UserPromptSubmit", "Notification", "Stop", "StopFailure"]
+        let quiet = (payload["coucou_quiet"] as? Bool ?? false)
+            || (alerting.contains(name) && SourceFocus.isInFront(payload: payload))
         // For sessions that carry no id, derive a unique key from pill + cwd so that
         // concurrent anonymous sessions are tracked independently in RecapStore.
         let recapSessionId = (sessionId == "unknown" || sessionId.isEmpty)
@@ -459,8 +462,10 @@ final class HookServer: @unchecked Sendable {
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) { state.tasks[idx].finalLine = nil }
             nbLog("SessionStart \(isExternalAgent ? agentId : projectName) (\(sessionId.prefix(8)))")
             NotificationCenter.default.post(name: .checkMondayRecap, object: nil)
-            if state.isPresent { expandIfNeeded(to: .overview) }
-            SoundEngine.shared.play("work")
+            if !quiet {
+                if state.isPresent { expandIfNeeded(to: .overview) }
+                SoundEngine.shared.play("work")
+            }
             if agentId == "agent_hermes", let platform = payload["platform"] as? String,
                !platform.isEmpty, platform != "cli" {
                 let capitalized = platform.prefix(1).uppercased() + platform.dropFirst()
@@ -515,7 +520,7 @@ final class HookServer: @unchecked Sendable {
             let lower = message.lowercased()
             if lower.contains("rate limit") || lower.contains("limite d") {
                 state.updateTask(id: agentId, state: .ratelimit)
-                SoundEngine.shared.play("rate")
+                if !quiet { SoundEngine.shared.play("rate") }
             } else if message.hasSuffix("?") {
                 state.updateTask(id: agentId, state: .question)
                 appendStep(id: agentId, step: message)
@@ -553,11 +558,13 @@ final class HookServer: @unchecked Sendable {
         case "StopFailure":
             RecapStore.shared.stop(sessionId: recapSessionId)
             state.updateTask(id: agentId, state: .error)
-            SoundEngine.shared.play("error")
-            if focused {
-                expandIfNeeded(to: .error)
-            } else {
-                setPillBadge(id: agentId, badge: .error)
+            if !quiet {
+                SoundEngine.shared.play("error")
+                if focused {
+                    expandIfNeeded(to: .error)
+                } else {
+                    setPillBadge(id: agentId, badge: .error)
+                }
             }
 
         case "Interrupt":
@@ -799,6 +806,16 @@ final class HookServer: @unchecked Sendable {
             return
         }
 
+        // The user is looking at the session's window: it asks there, no card.
+        if SourceFocus.isInFront(payload: payload) {
+            nbLog("PermissionRequest \(tool) left to the window in front")
+            Task.detached { [weak self] in
+                self?.sendLine(fd: fd, text: #"{"permissionDecision":"ask"}"#)
+                close(fd)
+            }
+            return
+        }
+
         let command = toolInput["command"] as? String ?? tool
 
         if pendingApprovalFD >= 0 {
@@ -959,6 +976,16 @@ final class HookServer: @unchecked Sendable {
             pillId = "integration_claude"
         }
         guard isCodexRequest || isCursorEditor || isVSCodeEditor else {
+            Task.detached { [weak self] in
+                self?.sendLine(fd: fd, text: #"{"permissionDecision":"ask"}"#)
+                close(fd)
+            }
+            return
+        }
+
+        // The user is looking at the session's window: the question is asked there, no card.
+        if SourceFocus.isInFront(payload: payload) {
+            nbLog("Question left to the window in front")
             Task.detached { [weak self] in
                 self?.sendLine(fd: fd, text: #"{"permissionDecision":"ask"}"#)
                 close(fd)
