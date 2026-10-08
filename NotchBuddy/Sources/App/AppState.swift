@@ -438,6 +438,15 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Claude's limits from its usage endpoint, for when no statusline reports them
+    /// (the Claude app's Code tab). Same throttle as Codex.
+    func refreshClaudePlanUsage() {
+        if let u = claudePlanUsage, Date().timeIntervalSince(u.updatedAt) < 60 { return }
+        Task {
+            if let u = await ClaudeUsageFetcher.fetch() { claudePlanUsage = u }
+        }
+    }
+
     func refreshPlanRelayState() {
         planRelayInstalled = HookServer.statusLineInstalled()
     }

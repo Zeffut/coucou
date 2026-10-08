@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Claude plan usage works with the Claude app**: the Code tab of the Claude app never runs Claude Code's status line, so the 5-hour and weekly limits stopped updating. When the Claude pill shows, Coucou now also asks Claude's usage endpoint (the one behind /usage) with the token Claude Code keeps in the Keychain — read without a prompt, never stored, sent only to api.anthropic.com *(GitHub build)*
 - **No alert for the window you're looking at**: when the session's window is in front, Mochi follows along without opening the island, playing a sound or adding a badge, and permission prompts and questions are asked in that window instead of the notch. With several windows of the same app, the window in front must be the project's (Accessibility, GitHub build)
 - **Claude and ChatGPT desktop apps**: Mochi thinks while the Claude or ChatGPT app writes an answer and tells you when it's ready — with the conversation title and an Open Claude / Open ChatGPT button — and shows when Claude waits for you to allow a tool. Turn it on in Settings → Agents → Claude & ChatGPT apps; it uses the Accessibility permission to read the apps' buttons and window title, never clicks or sends anything, and stays quiet when the app is already in front. Claude's chats share the Claude pill with its Code tab sessions — renamed from Claude Desktop and now under Where you code, so it can be your main pill; ChatGPT gets its own pill *(macOS, GitHub build)*
 

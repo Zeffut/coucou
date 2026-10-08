@@ -121,6 +121,48 @@ enum ClaudePlanGaugeTests {
         check("70 pct → 'Claude 70%'",                 ClaudePlanGauge.pillLabel(both),   "Claude 70%")
         check("55 pct → 'Claude 55%'",                 ClaudePlanGauge.pillLabel(fhOnly), "Claude 55%")
 
+        // ── usage endpoint ─────────────────────────────────────────────────────
+        print("ClaudePlanGauge.parseUsageResponse")
+
+        let isoFormatter = ISO8601DateFormatter()
+        let futureISO = isoFormatter.string(from: Date(timeIntervalSince1970: futureEpoch))
+            .replacingOccurrences(of: "Z", with: ".442477+00:00")
+        let api: [String: Any] = [
+            "five_hour": ["utilization": 39.0, "resets_at": futureISO, "limit_dollars": NSNull()],
+            "seven_day": ["utilization": 61, "resets_at": futureISO],
+            "seven_day_opus": NSNull(),
+        ]
+        let apiUsage = ClaudePlanGauge.parseUsageResponse(api)
+        checkTrue("usage response → five_hour 39",          apiUsage?.fiveHour?.usedPct == 39.0)
+        checkTrue("usage response → seven_day 61 (Int)",     apiUsage?.sevenDay?.usedPct == 61.0)
+        checkTrue("microsecond resets_at parsed",
+                  abs((apiUsage?.fiveHour?.resetsAt.timeIntervalSince1970 ?? 0) - futureEpoch.rounded(.down)) < 1)
+        checkTrue("seven_day only → five_hour nil",
+                  ClaudePlanGauge.parseUsageResponse(["five_hour": NSNull(),
+                                                      "seven_day": ["utilization": 5.0, "resets_at": futureISO]])?.fiveHour == nil)
+        checkTrue("empty response → nil",                    ClaudePlanGauge.parseUsageResponse([:]) == nil)
+        checkTrue("bad date → nil",
+                  ClaudePlanGauge.parseUsageResponse(["five_hour": ["utilization": 5.0, "resets_at": "soon"]]) == nil)
+        checkTrue("ISO without fraction",                    ClaudePlanGauge.isoDate("2026-10-12T19:00:00+00:00") != nil)
+
+        // ── credentials ────────────────────────────────────────────────────────
+        print("ClaudePlanGauge.accessToken")
+
+        func creds(_ oauth: [String: Any]) -> Data {
+            try! JSONSerialization.data(withJSONObject: ["claudeAiOauth": oauth, "mcpOAuth": [:]])
+        }
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        check("valid token",
+              ClaudePlanGauge.accessToken(fromCredentials: creds(["accessToken": "tok", "expiresAt": nowMs + 60_000])) ?? "nil", "tok")
+        check("expired token → nil",
+              ClaudePlanGauge.accessToken(fromCredentials: creds(["accessToken": "tok", "expiresAt": nowMs - 1])) ?? "nil", "nil")
+        check("no expiry → token",
+              ClaudePlanGauge.accessToken(fromCredentials: creds(["accessToken": "tok"])) ?? "nil", "tok")
+        check("empty token → nil",
+              ClaudePlanGauge.accessToken(fromCredentials: creds(["accessToken": ""])) ?? "nil", "nil")
+        check("not JSON → nil",
+              ClaudePlanGauge.accessToken(fromCredentials: Data("nope".utf8)) ?? "nil", "nil")
+
         // ── finish ─────────────────────────────────────────────────────────────
         if failures == 0 {
             print("\nAll tests passed.")
